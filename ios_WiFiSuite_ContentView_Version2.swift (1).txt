@@ -1,0 +1,105 @@
+import SwiftUI
+import CoreLocation
+import SystemConfiguration.CaptiveNetwork
+import AuthenticationServices
+import CoreImage.CIFilterBuiltins
+
+struct WiFiInfo: Identifiable, Codable {
+    let id = UUID()
+    let ssid: String
+    let bssid: String
+    let date: Date
+    func prettyString() -> String {
+        "SSID: \(ssid)\nBSSID: \(bssid)\nDate: \(date.formatted())"
+    }
+}
+
+struct ContentView: View {
+    @State private var user: String? = "Jane Doe"
+    @State private var currentWiFi = WiFiInfo(ssid: "Home_Network", bssid: "xx:xx:xx:xx:xx:xx", date: Date())
+    @State private var showQR = false
+    @State private var history = [WiFiInfo]()
+    @State private var cloudSync = true
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("WiFiSuite").font(.title)
+                Spacer()
+                if user != nil {
+                    Button("Logout") { user = nil }
+                }
+            }
+            if user == nil {
+                SignInWithAppleButton(.signIn) { _ in } onCompletion: { _ in user = "Jane Doe" }
+                    .frame(height: 44)
+            } else {
+                Text("Welcome, \(user!)!")
+                CardView(info: currentWiFi)
+                HStack {
+                    Button("Copy") { UIPasteboard.general.string = currentWiFi.prettyString() }
+                    Button("Share") { share(text: currentWiFi.prettyString()) }
+                    Button("Show QR") { showQR = true }
+                    Button("Save/Sync") { history.insert(currentWiFi, at: 0) }
+                }
+                .padding(.bottom, 6)
+                if showQR {
+                    QRCodeSheet(data: currentWiFi.prettyString(), isPresented: $showQR)
+                }
+                Text("History").font(.headline)
+                List(history) { wifi in
+                    Text("\(wifi.ssid) – \(wifi.date.formatted())")
+                }
+                HStack {
+                    Toggle("Cloud Sync", isOn: $cloudSync)
+                    Spacer()
+                    Button("Logout") { user = nil }
+                }
+            }
+        }.padding()
+    }
+}
+
+struct CardView: View {
+    let info: WiFiInfo
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Color(.secondarySystemBackground))
+            .frame(maxWidth: .infinity)
+            .overlay(
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("SSID: \(info.ssid)")
+                    Text("BSSID: \(info.bssid)")
+                    Text("Date: \(info.date.formatted())")
+                }.padding()
+            ).padding(.vertical, 8)
+    }
+}
+
+struct QRCodeSheet: View {
+    let data: String
+    @Binding var isPresented: Bool
+    var body: some View {
+        VStack {
+            Image(uiImage: generateQRCode(from: data))
+                .interpolation(.none)
+                .resizable()
+                .frame(width: 220, height: 220)
+            Button("Close") { isPresented = false }
+        }.padding()
+    }
+    func generateQRCode(from string: String) -> UIImage {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(string.utf8)
+        if let output = filter.outputImage {
+            let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+            return UIImage(ciImage: scaled)
+        }
+        return UIImage(systemName: "xmark.circle") ?? UIImage()
+    }
+}
+
+func share(text: String) {
+    let av = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+    UIApplication.shared.windows.first?.rootViewController?.present(av, animated: true)
+}
