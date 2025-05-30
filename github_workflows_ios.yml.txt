@@ -1,0 +1,23 @@
+name: iOS CI
+
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+    - name: Set up Xcode
+      run: echo "Using default Xcode version"
+    - name: Build
+      run: |
+        cd ios
+        xcodebuild -scheme WiFiSuite -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 14' build
